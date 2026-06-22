@@ -185,6 +185,17 @@ class AnalysisPage(ctk.CTkFrame):
         self.var_inner.pack(fill="both", padx=Spacing.CARD_PAD,
                        pady=Spacing.CARD_PAD)
 
+        # Actions for variables
+        self.var_actions = ctk.CTkFrame(self.var_inner, fg_color="transparent")
+        self.var_actions.pack(fill="x", pady=(0, Spacing.SM))
+        
+        ActionButton(self.var_actions, text="Selecionar Todos", icon="☑️",
+                     color=Colors.PRIMARY, width=150, height=28,
+                     command=self._select_all_vars).pack(side="left", padx=(0, Spacing.SM))
+        ActionButton(self.var_actions, text="Desmarcar Todos", icon="☐",
+                     color=Colors.BG_CARD_HOVER, hover_color=Colors.BORDER, width=150, height=28,
+                     command=self._deselect_all_vars).pack(side="left")
+
         self.var_checkboxes = {}
         self._var_grid = None
 
@@ -261,6 +272,16 @@ class AnalysisPage(ctk.CTkFrame):
             if default:
                 cb.select()
             self.var_checkboxes[name] = cb
+
+    def _select_all_vars(self):
+        """Selecionar todas as variáveis."""
+        for cb in self.var_checkboxes.values():
+            cb.select()
+
+    def _deselect_all_vars(self):
+        """Desmarcar todas as variáveis."""
+        for cb in self.var_checkboxes.values():
+            cb.deselect()
 
     def _refresh_from_data(self):
         """Update the page based on currently loaded data."""
