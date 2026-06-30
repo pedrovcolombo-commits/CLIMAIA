@@ -192,7 +192,10 @@ class DataPage(ctk.CTkFrame):
         raw_df = state.get("raw_df")
         if raw_df is not None:
             raw_path = state.get("raw_path", "")
-            filename = os.path.basename(raw_path) if raw_path else "arquivo.csv"
+            if raw_path and ", " in raw_path:
+                filename = f"{len(raw_path.split(', '))} arquivos carregados"
+            else:
+                filename = os.path.basename(raw_path) if raw_path else "arquivo.csv"
             rows, cols = raw_df.shape
             self.raw_badge.set_status("ready", "CARREGADO")
             self.raw_info.configure(
@@ -204,7 +207,10 @@ class DataPage(ctk.CTkFrame):
         treated_df = state.get("treated_df")
         if treated_df is not None:
             treated_path = state.get("treated_path", "")
-            filename = os.path.basename(treated_path) if treated_path else "arquivo.csv"
+            if treated_path and ", " in treated_path:
+                filename = f"{len(treated_path.split(', '))} arquivos carregados"
+            else:
+                filename = os.path.basename(treated_path) if treated_path else "arquivo.csv"
             rows, cols = treated_df.shape
             self.treated_badge.set_status("ready", "CARREGADO")
             self.treated_info.configure(
@@ -217,7 +223,7 @@ class DataPage(ctk.CTkFrame):
             self._update_summary()
 
     def _load_file(self, dtype: str):
-        filepath = filedialog.askopenfilename(
+        filepaths = filedialog.askopenfilenames(
             title=f"Selecionar {'Dados Brutos' if dtype == 'raw' else 'Dados Tratados'}",
             filetypes=[
                 ("Dados Climáticos", "*.csv *.xlsx *.xls"),
@@ -226,62 +232,86 @@ class DataPage(ctk.CTkFrame):
                 ("All files", "*.*"),
             ])
 
-        if not filepath:
+        if not filepaths:
             return
 
-        try:
-            ext = os.path.splitext(filepath)[1].lower()
+        dfs = []
+        filenames = []
+        
+        for filepath in filepaths:
+            try:
+                ext = os.path.splitext(filepath)[1].lower()
 
-            if ext in ('.xlsx', '.xls'):
-                # Excel file
-                df = pd.read_excel(filepath, engine='openpyxl')
-            else:
-                # CSV file — get settings from app state
-                read_kwargs = {}
-                if self.app:
-                    read_kwargs = self.app.get_csv_read_kwargs()
+                if ext in ('.xlsx', '.xls'):
+                    # Excel file
+                    df = pd.read_excel(filepath, engine='openpyxl')
+                else:
+                    # CSV file — get settings from app state
+                    read_kwargs = {}
+                    if self.app:
+                        read_kwargs = self.app.get_csv_read_kwargs()
 
-                # Try with settings first, fallback to auto-detect separator
-                try:
-                    df = pd.read_csv(filepath, **read_kwargs)
-                    # If auto-detect parsed only 1 column, it likely failed. Try semicolon.
-                    if len(df.columns) == 1 and read_kwargs.get('sep') is None:
-                        df_alt = pd.read_csv(filepath, sep=';')
-                        if len(df_alt.columns) > 1:
-                            df = df_alt
-                except Exception:
-                    # Fallback: try semicolon separator (common in BR data)
+                    # Try with settings first, fallback to auto-detect separator
                     try:
-                        df = pd.read_csv(filepath, sep=';')
+                        df = pd.read_csv(filepath, **read_kwargs)
+                        # If auto-detect parsed only 1 column, it likely failed. Try semicolon.
+                        if len(df.columns) == 1 and read_kwargs.get('sep') is None:
+                            df_alt = pd.read_csv(filepath, sep=';')
+                            if len(df_alt.columns) > 1:
+                                df = df_alt
                     except Exception:
-                        df = pd.read_csv(filepath)
+                        # Fallback: try semicolon separator (common in BR data)
+                        try:
+                            df = pd.read_csv(filepath, sep=';')
+                        except Exception:
+                            df = pd.read_csv(filepath)
 
-            filename = os.path.basename(filepath)
-            rows, cols = df.shape
+                dfs.append(df)
+                filenames.append(os.path.basename(filepath))
+            except Exception as e:
+                messagebox.showerror("Erro ao Carregar",
+                                      f"Não foi possível ler o arquivo {os.path.basename(filepath)}:\n{e}")
+                if self.app:
+                    self.app.log(f"ERRO ao carregar arquivo {filepath}: {e}")
+
+        if not dfs:
+            return
+            
+        try:
+            final_df = pd.concat(dfs, ignore_index=True)
+            
+            if len(filenames) == 1:
+                display_filename = filenames[0]
+                stored_path = filepaths[0]
+            else:
+                display_filename = f"{len(filenames)} arquivos carregados"
+                stored_path = ", ".join(filepaths)
+                
+            rows, cols = final_df.shape
 
             if dtype == "raw":
                 self.raw_badge.set_status("ready", "CARREGADO")
                 self.raw_info.configure(
-                    text=f"📄 {filename}  •  {rows:,} linhas  •  {cols} colunas",
+                    text=f"📄 {display_filename}  •  {rows:,} linhas  •  {cols} colunas",
                     text_color=Colors.TEXT_SECONDARY)
-                self._update_preview(self.raw_preview_text, df)
+                self._update_preview(self.raw_preview_text, final_df)
             else:
                 self.treated_badge.set_status("ready", "CARREGADO")
                 self.treated_info.configure(
-                    text=f"📄 {filename}  •  {rows:,} linhas  •  {cols} colunas",
+                    text=f"📄 {display_filename}  •  {rows:,} linhas  •  {cols} colunas",
                     text_color=Colors.TEXT_SECONDARY)
-                self._update_preview(self.treated_preview_text, df)
+                self._update_preview(self.treated_preview_text, final_df)
 
             # Store in app state
             if self.app:
                 if dtype == "raw":
-                    self.app.app_state["raw_df"] = df
-                    self.app.app_state["raw_path"] = filepath
-                    self.app.app_state["raw_columns"] = df.columns.tolist()
+                    self.app.app_state["raw_df"] = final_df
+                    self.app.app_state["raw_path"] = stored_path
+                    self.app.app_state["raw_columns"] = final_df.columns.tolist()
                 else:
-                    self.app.app_state["treated_df"] = df
-                    self.app.app_state["treated_path"] = filepath
-                    self.app.app_state["treated_columns"] = df.columns.tolist()
+                    self.app.app_state["treated_df"] = final_df
+                    self.app.app_state["treated_path"] = stored_path
+                    self.app.app_state["treated_columns"] = final_df.columns.tolist()
 
                 # Reset downstream results (analysis/comparison invalidated)
                 self.app.app_state["analysis_ran"] = False
@@ -290,16 +320,16 @@ class DataPage(ctk.CTkFrame):
                 self.app.app_state["comparison_results"] = None
 
                 self.app.log(
-                    f"Dataset {'bruto' if dtype == 'raw' else 'tratado'} carregado: "
-                    f"{filename} ({rows:,} linhas, {cols} colunas)")
+                    f"Dataset(s) {'bruto(s)' if dtype == 'raw' else 'tratado(s)'} carregado(s): "
+                    f"{display_filename} ({rows:,} linhas, {cols} colunas)")
 
             self._update_summary()
 
         except Exception as e:
-            messagebox.showerror("Erro ao Carregar",
-                                  f"Não foi possível ler o arquivo:\n{e}")
+            messagebox.showerror("Erro ao Concatenar/Atualizar",
+                                  f"Ocorreu um erro ao processar os arquivos carregados:\n{e}")
             if self.app:
-                self.app.log(f"ERRO ao carregar arquivo: {e}")
+                self.app.log(f"ERRO ao processar arquivos múltiplos: {e}")
 
     def _clear_data(self, dtype: str):
         """Clear loaded data and reset downstream analysis state."""
