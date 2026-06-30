@@ -72,6 +72,7 @@ class ActionButton(ctk.CTkButton):
                  hover_color: str = Colors.PRIMARY_HOVER,
                  **kwargs):
         display = f"{icon}  {text}" if icon else text
+        height = kwargs.pop('height', 40)
         super().__init__(
             master,
             text=display,
@@ -80,7 +81,7 @@ class ActionButton(ctk.CTkButton):
             hover_color=hover_color,
             text_color="#ffffff",
             corner_radius=Spacing.CORNER_SM,
-            height=40,
+            height=height,
             **kwargs,
         )
 
