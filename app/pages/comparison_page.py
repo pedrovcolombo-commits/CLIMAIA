@@ -94,13 +94,13 @@ class ComparisonPage(ctk.CTkFrame):
                                       sticky="nsew")
 
         self.card_created = StatCard(
-            stats_frame, icon="🆕", label="Eventos Criados",
+            stats_frame, icon="🆕", label="Criados pelo Tratamento",
             value="—", accent=Colors.WARNING)
         self.card_created.grid(row=0, column=2, padx=(0, Spacing.MD),
                                 sticky="nsew")
 
         self.card_suppressed = StatCard(
-            stats_frame, icon="🚫", label="Eventos Suprimidos",
+            stats_frame, icon="🚫", label="Suprimidos pelo Tratamento",
             value="—", accent=Colors.DANGER)
         self.card_suppressed.grid(row=0, column=3, sticky="nsew")
 
@@ -200,8 +200,8 @@ class ComparisonPage(ctk.CTkFrame):
                 r = comp_results[var]
                 vals = [
                     var,
-                    f"{r['total_raw']:,}",
-                    f"{r['total_treated']:,}",
+                    f"{r['total_raw_episodes']:,}",
+                    f"{r['total_treated_episodes']:,}",
                     f"{r['coincident']:,}",
                     f"{r['created']:,}",
                     f"{r['suppressed']:,}",
@@ -280,8 +280,8 @@ class ComparisonPage(ctk.CTkFrame):
             self._reset_stats_cards()
             return
         
-        tot_raw = sum(r["total_raw"] for r in results.values())
-        tot_treated = sum(r["total_treated"] for r in results.values())
+        tot_raw = sum(r["total_raw_episodes"] for r in results.values())
+        tot_treated = sum(r["total_treated_episodes"] for r in results.values())
         tot_created = sum(r["created"] for r in results.values())
         tot_suppressed = sum(r["suppressed"] for r in results.values())
         
@@ -308,8 +308,8 @@ class ComparisonPage(ctk.CTkFrame):
 
         # Prepare data for matplotlib
         vars_list = list(results.keys())
-        raw_events = [results[v]["total_raw"] for v in vars_list]
-        treated_events = [results[v]["total_treated"] for v in vars_list]
+        raw_events = [results[v]["total_raw_episodes"] for v in vars_list]
+        treated_events = [results[v]["total_treated_episodes"] for v in vars_list]
         coincident = [results[v]["coincident"] for v in vars_list]
 
         fig = Figure(figsize=(7, 2.8), facecolor=Colors.BG_CARD)
@@ -389,6 +389,8 @@ class ComparisonPage(ctk.CTkFrame):
         config = state.get("analysis_config") or {}
         variables = config.get("variables", [])
         method = config.get("method", "N/A")
+        min_gap = config.get("min_gap", 12)
+        min_duration = config.get("min_duration", 6)
 
         self.comparison_status.set_status("running", "EXECUTANDO...")
         self.console.log("━" * 50)
@@ -410,16 +412,19 @@ class ComparisonPage(ctk.CTkFrame):
                     raw_mask = analysis_res["raw"]["events"][var]
                     treated_mask = analysis_res["treated"]["events"][var]
                     
-                    metrics = compare_event_masks(raw_mask, treated_mask)
+                    metrics = compare_event_masks(
+                        raw_mask, treated_mask, min_gap=min_gap, min_duration=min_duration
+                    )
                     comp_results[var] = metrics
                     
                     self.console.log(f"\n📈 Resultados para: {var}")
-                    self.console.log(f"  - Eventos Brutos: {metrics['total_raw']:,}")
-                    self.console.log(f"  - Eventos Tratados: {metrics['total_treated']:,}")
+                    self.console.log(f"  - Eventos Brutos (episódios): {metrics['total_raw_episodes']:,}")
+                    self.console.log(f"  - Eventos Tratados (episódios): {metrics['total_treated_episodes']:,}")
                     self.console.log(f"  - Coincidentes: {metrics['coincident']:,}")
                     self.console.log(f"  - Criados pelo Tratamento: {metrics['created']:,}")
                     self.console.log(f"  - Suprimidos pelo Tratamento: {metrics['suppressed']:,}")
-                    self.console.log(f"  - Taxa de Concordância (Jaccard): {metrics['agreement_pct']:.2f}%")
+                    self.console.log(f"  - Pontos extremos (bruto/tratado): {metrics['total_raw']:,} / {metrics['total_treated']:,}")
+                    self.console.log(f"  - Taxa de Concordância: {metrics['agreement_pct']:.2f}%")
                 else:
                     self.console.log(f"\n⚠️ Não foi possível comparar '{var}': dados ausentes em um dos datasets.")
 
@@ -485,13 +490,13 @@ class ComparisonPage(ctk.CTkFrame):
                 f.write("-" * 40 + "\n")
                 f.write("Resumo Geral da Análise\n")
                 f.write("-" * 40 + "\n")
-                tot_raw = sum(r["total_raw"] for r in comp_results.values())
-                tot_treated = sum(r["total_treated"] for r in comp_results.values())
+                tot_raw = sum(r["total_raw_episodes"] for r in comp_results.values())
+                tot_treated = sum(r["total_treated_episodes"] for r in comp_results.values())
                 tot_created = sum(r["created"] for r in comp_results.values())
                 tot_suppressed = sum(r["suppressed"] for r in comp_results.values())
                 
-                f.write(f"Total de Eventos Brutos: {tot_raw:,}\n")
-                f.write(f"Total de Eventos Tratados: {tot_treated:,}\n")
+                f.write(f"Total de Eventos Brutos (episódios): {tot_raw:,}\n")
+                f.write(f"Total de Eventos Tratados (episódios): {tot_treated:,}\n")
                 f.write(f"Total de Eventos Criados: {tot_created:,}\n")
                 f.write(f"Total de Eventos Suprimidos: {tot_suppressed:,}\n\n")
 
@@ -501,11 +506,12 @@ class ComparisonPage(ctk.CTkFrame):
                 f.write("-" * 40 + "\n")
                 for var, r in comp_results.items():
                     f.write(f"\nVariável: {var}\n")
-                    f.write(f"  - Eventos Brutos: {r['total_raw']:,}\n")
-                    f.write(f"  - Eventos Tratados: {r['total_treated']:,}\n")
+                    f.write(f"  - Eventos Brutos (episódios): {r['total_raw_episodes']:,}\n")
+                    f.write(f"  - Eventos Tratados (episódios): {r['total_treated_episodes']:,}\n")
+                    f.write(f"  - Pontos extremos (bruto/tratado): {r['total_raw']:,} / {r['total_treated']:,}\n")
                     f.write(f"  - Coincidentes: {r['coincident']:,}\n")
-                    f.write(f"  - Criados (Falsos Alarmes): {r['created']:,}\n")
-                    f.write(f"  - Suprimidos (Perdidos): {r['suppressed']:,}\n")
+                    f.write(f"  - Criados (só no Tratado): {r['created']:,}\n")
+                    f.write(f"  - Suprimidos (só no Bruto): {r['suppressed']:,}\n")
                     f.write(f"  - Índice de Concordância: {r['agreement_pct']:.2f}%\n")
                 
                 f.write("\n" + "=" * 60 + "\n")

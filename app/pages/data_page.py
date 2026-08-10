@@ -4,6 +4,8 @@ Load, preview, and manage raw & treated climate datasets.
 """
 
 import os
+import zipfile
+import tempfile
 import customtkinter as ctk
 import pandas as pd
 from tkinter import filedialog, messagebox
@@ -42,14 +44,14 @@ class DataPage(ctk.CTkFrame):
         # Raw Data Card
         self.raw_card = self._build_upload_card(
             upload_row, "📄  Dados Brutos",
-            "Carregue o arquivo CSV com os dados meteorológicos sem tratamento.",
+            "Carregue CSVs, Excel ou um ZIP com todos os dados do período.",
             "raw")
         self.raw_card.grid(row=0, column=0, padx=(0, Spacing.MD), sticky="nsew")
 
         # Treated Data Card
         self.treated_card = self._build_upload_card(
             upload_row, "✨  Dados Tratados",
-            "Carregue o arquivo CSV com os dados após interpolação/limpeza.",
+            "Carregue CSVs, Excel ou um ZIP com todos os dados tratados.",
             "treated")
         self.treated_card.grid(row=0, column=1, sticky="nsew")
 
@@ -222,11 +224,50 @@ class DataPage(ctk.CTkFrame):
         if raw_df is not None or treated_df is not None:
             self._update_summary()
 
+    def _extract_files_from_zip(self, zip_path: str) -> list:
+        """Extract CSV/Excel files from a ZIP archive to a temp directory.
+        Returns a list of extracted file paths."""
+        extracted = []
+        try:
+            temp_dir = tempfile.mkdtemp(prefix="climaia_")
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                for member in zf.namelist():
+                    # Skip directories and hidden/system files
+                    if member.endswith('/') or member.startswith('__MACOSX'):
+                        continue
+                    ext = os.path.splitext(member)[1].lower()
+                    if ext in ('.csv', '.xlsx', '.xls'):
+                        # Extract preserving just the filename (flatten)
+                        filename = os.path.basename(member)
+                        if not filename:
+                            continue
+                        target_path = os.path.join(temp_dir, filename)
+                        # Handle duplicate filenames
+                        counter = 1
+                        base, fext = os.path.splitext(filename)
+                        while os.path.exists(target_path):
+                            target_path = os.path.join(temp_dir, f"{base}_{counter}{fext}")
+                            counter += 1
+                        with zf.open(member) as source, open(target_path, 'wb') as target:
+                            target.write(source.read())
+                        extracted.append(target_path)
+            
+            if self.app:
+                self.app.log(f"ZIP extraído: {len(extracted)} arquivo(s) de dados encontrado(s) em {os.path.basename(zip_path)}")
+        except zipfile.BadZipFile:
+            messagebox.showerror("Erro no ZIP",
+                                  f"O arquivo '{os.path.basename(zip_path)}' não é um ZIP válido.")
+        except Exception as e:
+            messagebox.showerror("Erro ao Extrair ZIP",
+                                  f"Erro ao processar o ZIP:\n{e}")
+        return extracted
+
     def _load_file(self, dtype: str):
         filepaths = filedialog.askopenfilenames(
             title=f"Selecionar {'Dados Brutos' if dtype == 'raw' else 'Dados Tratados'}",
             filetypes=[
-                ("Dados Climáticos", "*.csv *.xlsx *.xls"),
+                ("Dados Climáticos", "*.csv *.xlsx *.xls *.zip"),
+                ("Arquivo ZIP", "*.zip"),
                 ("CSV files", "*.csv"),
                 ("Excel files", "*.xlsx *.xls"),
                 ("All files", "*.*"),
@@ -237,8 +278,26 @@ class DataPage(ctk.CTkFrame):
 
         dfs = []
         filenames = []
-        
+
+        # Expand ZIP files into individual data files
+        expanded_paths = []
         for filepath in filepaths:
+            ext = os.path.splitext(filepath)[1].lower()
+            if ext == '.zip':
+                zip_files = self._extract_files_from_zip(filepath)
+                if zip_files:
+                    expanded_paths.extend(zip_files)
+                    filenames.append(f"{os.path.basename(filepath)} ({len(zip_files)} arquivos)")
+                else:
+                    messagebox.showwarning("ZIP Vazio",
+                                            f"Nenhum arquivo CSV/Excel encontrado em '{os.path.basename(filepath)}'.")
+            else:
+                expanded_paths.append(filepath)
+
+        if not expanded_paths:
+            return
+
+        for filepath in expanded_paths:
             try:
                 ext = os.path.splitext(filepath)[1].lower()
 
@@ -267,7 +326,10 @@ class DataPage(ctk.CTkFrame):
                             df = pd.read_csv(filepath)
 
                 dfs.append(df)
-                filenames.append(os.path.basename(filepath))
+                # Only add filename if not already added (zip case)
+                basename = os.path.basename(filepath)
+                if basename not in filenames and not any(basename in f for f in filenames):
+                    filenames.append(basename)
             except Exception as e:
                 messagebox.showerror("Erro ao Carregar",
                                       f"Não foi possível ler o arquivo {os.path.basename(filepath)}:\n{e}")

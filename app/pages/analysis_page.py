@@ -145,7 +145,21 @@ class AnalysisPage(ctk.CTkFrame):
             right_inner, label="Limiar de Sensibilidade (%)",
             placeholder="95")
         self.threshold.pack(fill="x", pady=(0, Spacing.MD))
-        self.threshold.set("95")
+        self.threshold.set("99.5")
+
+        # Min gap for episode grouping
+        self.min_gap = LabeledEntry(
+            right_inner, label="Separação mín. entre eventos (pontos)",
+            placeholder="12")
+        self.min_gap.pack(fill="x", pady=(0, Spacing.MD))
+        self.min_gap.set("12")
+
+        # Min duration for an episode to count
+        self.min_duration = LabeledEntry(
+            right_inner, label="Duração mínima do evento (pontos)",
+            placeholder="6")
+        self.min_duration.pack(fill="x", pady=(0, Spacing.MD))
+        self.min_duration.set("6")
 
         # Target datasets
         ctk.CTkLabel(right_inner, text="Aplicar Em", font=Fonts.SMALL_BOLD,
@@ -402,6 +416,22 @@ class AnalysisPage(ctk.CTkFrame):
             self.run_status.set_status("error", "LIMIAR INVÁLIDO")
             return
 
+        # Validate min_gap
+        try:
+            min_gap_val = int(self.min_gap.get())
+            if min_gap_val < 1:
+                min_gap_val = 1
+        except (ValueError, TypeError):
+            min_gap_val = 12  # Default
+
+        # Validate min_duration
+        try:
+            min_dur_val = int(self.min_duration.get())
+            if min_dur_val < 1:
+                min_dur_val = 1
+        except (ValueError, TypeError):
+            min_dur_val = 6  # Default
+
         # ── Get config ────────────────────────────────────────────────────
         method = self.method.get()
         granularity = self.granularity.get()
@@ -412,6 +442,8 @@ class AnalysisPage(ctk.CTkFrame):
         self.console.log("🔬 Iniciando análise de eventos extremos...")
         self.console.log(f"  📊 Método: {method}")
         self.console.log(f"  🎯 Limiar: {threshold_val}%")
+        self.console.log(f"  🔗 Separação mín. entre eventos: {min_gap_val} pontos")
+        self.console.log(f"  ⏳ Duração mín. do evento: {min_dur_val} pontos")
         self.console.log(f"  ⏱️  Granularidade: {granularity}")
         self.console.log(f"  📅 Período: {period}")
 
@@ -428,6 +460,8 @@ class AnalysisPage(ctk.CTkFrame):
         config = {
             "method": method,
             "threshold": threshold_val,
+            "min_gap": min_gap_val,
+            "min_duration": min_dur_val,
             "granularity": granularity,
             "period": period,
             "variables": selected_vars,
@@ -438,7 +472,7 @@ class AnalysisPage(ctk.CTkFrame):
         self.app.app_state["analysis_config"] = config
 
         # ── Execute statistical engine ────────────────────────────────────
-        from src.statistical.extreme_detection import detect_extremes
+        from src.statistical.extreme_detection import detect_extremes, count_event_episodes
 
         results = {"raw": {}, "treated": {}}
         
@@ -476,14 +510,16 @@ class AnalysisPage(ctk.CTkFrame):
                     if var in raw_df.columns:
                         mask = detect_extremes(raw_df, var, method, threshold_pct=threshold_val)
                         results["raw"]["events"][var] = mask
-                        n_events = mask.sum()
-                        pct = (n_events / len(mask)) * 100 if len(mask) > 0 else 0
+                        n_points = mask.sum()
+                        n_episodes = count_event_episodes(mask, min_gap=min_gap_val, min_duration=min_dur_val)
+                        pct = (n_points / len(mask)) * 100 if len(mask) > 0 else 0
                         results["raw"]["summary"][var] = {
-                            "count": int(n_events),
+                            "count": int(n_points),
+                            "episodes": int(n_episodes),
                             "pct": float(pct),
-                            "mean": float(raw_df.loc[mask, var].mean()) if n_events > 0 else 0
+                            "mean": float(raw_df.loc[mask, var].mean()) if n_points > 0 else 0
                         }
-                        self.console.log(f"  ✅ {var}: {n_events:,} eventos extremos detectados ({pct:.2f}%)")
+                        self.console.log(f"  ✅ {var}: {n_episodes} evento(s) climático(s) ({n_points:,} pontos extremos, {pct:.2f}%)")
                     else:
                         self.console.log(f"  ⚠️ Coluna '{var}' não encontrada no dataset bruto.")
 
@@ -497,14 +533,16 @@ class AnalysisPage(ctk.CTkFrame):
                     if var in treated_df.columns:
                         mask = detect_extremes(treated_df, var, method, threshold_pct=threshold_val)
                         results["treated"]["events"][var] = mask
-                        n_events = mask.sum()
-                        pct = (n_events / len(mask)) * 100 if len(mask) > 0 else 0
+                        n_points = mask.sum()
+                        n_episodes = count_event_episodes(mask, min_gap=min_gap_val, min_duration=min_dur_val)
+                        pct = (n_points / len(mask)) * 100 if len(mask) > 0 else 0
                         results["treated"]["summary"][var] = {
-                            "count": int(n_events),
+                            "count": int(n_points),
+                            "episodes": int(n_episodes),
                             "pct": float(pct),
-                            "mean": float(treated_df.loc[mask, var].mean()) if n_events > 0 else 0
+                            "mean": float(treated_df.loc[mask, var].mean()) if n_points > 0 else 0
                         }
-                        self.console.log(f"  ✅ {var}: {n_events:,} eventos extremos detectados ({pct:.2f}%)")
+                        self.console.log(f"  ✅ {var}: {n_episodes} evento(s) climático(s) ({n_points:,} pontos extremos, {pct:.2f}%)")
                     else:
                         self.console.log(f"  ⚠️ Coluna '{var}' não encontrada no dataset tratado.")
 
