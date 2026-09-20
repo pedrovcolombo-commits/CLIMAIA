@@ -201,6 +201,5 @@ Fase 7 (Empacotamento IA p/ Windows):  █████████████�
 
 ## 👤 Autor
 
-**Victor Vieira Colombo**  
-Repositório: [github.com/VituColombo0/CLIMAIA](https://github.com/VituColombo0/CLIMAIA)  
-Licença: Privado
+**Pedro Vieira Colombo**  
+Licença: Público
