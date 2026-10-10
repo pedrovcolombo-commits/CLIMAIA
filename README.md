@@ -75,7 +75,7 @@ python main.py
 
 ## 🧠 Modelos de Inteligência Artificial Inclusos
 
-O sistema já é distribuído com **16 modelos e artefatos pré-treinados** integrados na pasta `data/models_trained/`. Estes modelos foram treinados sobre 4 anos de dados meteorológicos para 4 variáveis distintas:
+O sistema já é distribuído com **modelos e artefatos pré-treinados** integrados na pasta `data/models_trained/`. Estes modelos foram treinados sobre 4 anos de dados meteorológicos para 4 variáveis distintas:
 - **Temperatura (°C)**
 - **Velocidade do Vento (m/s)**
 - **Umidade Relativa (%)**
@@ -127,16 +127,8 @@ Aqui o CLIMAIA funciona como um auditor. Ele cruza os resultados da Aba 2 para d
   - *Suprimidos*: O tratamento APAGOU ou suavizou eventos reais que constavam no arquivo bruto.
 - **Botão "Exportar Relatório"**: Salva essas métricas exatas e os painéis numéricos em uma nova tabela CSV no seu computador para prestação de contas.
 
-### 4. 🔮 Aba: Previsão (Machine Learning & AI)
-Módulo preditivo e de regressão para tentar descobrir o futuro climático com base no histórico que foi fornecido.
-- **Menu "Variável Alvo"**: Define o que a Inteligência Artificial vai tentar adivinhar (ex: prever a Radiação Solar de amanhã).
-- **Botão "Carregar Modelo Treinado"**: O CLIMAIA já possui 16 cérebros de IA (XGBoost e LSTM) pré-treinados empacotados dentro do arquivo `.exe` e do código fonte. Ao clicar aqui, você ativa essa inteligência instantaneamente sem precisar gastar energia e tempo treinando o seu computador.
-- **Botões de Histórico e Épocas**: Controles deslizantes que dizem para a IA o quanto ela deve olhar para o passado (Histórico de Dias) para tentar adivinhar o futuro.
-- **Botão "Treinar Novo Modelo"**: Utilize este botão **somente** se você tiver inserido planilhas com dados de regiões completamente novas que a IA original desconhece. Ele irá rodar algoritmos de *gradient boosting* no background. O console inferior mostrará o andamento do treinamento (RMSE, MAE e Loss).
-- **Botão "Salvar Modelo"**: Grava os novos cérebros recém-treinados em disco (formato `.json` para árvores, `.h5` para redes neurais).
-- **Botão "Executar Previsão"**: É a ação final. Ele lê os dados mais recentes que você carregou, processa na IA e plota na tela a curva prevista para os próximos dias (conforme escolhido no menu *Horizonte de Previsão*), além de pintar em vermelho se a previsão tocar na faixa que a Aba de Análise classificou como perigo/extremo.
 
-### 5. ⚙️ Aba: Configurações (Preferences & Maintenance)
+### 4. ⚙️ Aba: Configurações (Preferences & Maintenance)
 Central de controle visual e manutenção de memória do software.
 - **Menus "Aparência" e "Escala"**: Altere instantaneamente o software do modo *Escuro* (Dark) para *Claro* (Light) e use o multiplicador de *Escala* (ex: 120%) se estiver utilizando o aplicativo em uma televisão ou monitor de alta resolução para deixar as letras maiores.
 - **Painel de "Importação de CSV"**: Em 90% das vezes o sistema auto-detecta formatos (vírgulas vs ponto-e-vírgula). Se por acaso o seu CSV for carregado na "Aba Dados" como uma única coluna bagunçada, venha aqui e force o **Separador** para `,` ou `;`, defina o **Encoding** (UTF-8 ou ISO-8859-1) e digite o nome exato da **Coluna de Datas**.
@@ -167,7 +159,7 @@ Central de controle visual e manutenção de memória do software.
 
 ### ⚙️ 19/05/2026 a 21/05/2026 — Motores de Comparação e IA Preditiva
 - Criação do "Motor Analítico" para gerar o laudo de discrepância (Bruto vs Tratado).
-- Modelagem preditiva com Redes Neurais (**LSTM**) e **XGBoost** (`forecaster.py`).
+- Modelagem preditiva com Redes Neurais (**LSTM**) (`forecaster.py`).
 - Implementação de sub-processos (threading) para manter a fluidez da GUI.
 
 ### 📊 23/05/2026 a 25/05/2026 — Visualização e Testes de UX
@@ -191,7 +183,7 @@ Central de controle visual e manutenção de memória do software.
 Fase 1 (Interface e UX Design):        ██████████████████████████████ 100% ✅
 Fase 2 (Motor Estatístico de Eventos): ██████████████████████████████ 100% ✅
 Fase 3 (Modelagem LSTM/XGBoost):       ██████████████████████████████ 100% ✅
-Fase 4 (Comparador Bruto vs Tratado):  ██████████████████████████████ 100% ✅
+Fase 4 (Comparador Bruto vs Tratado):  ██████████████████████████████ 90% ✅
 Fase 5 (Gráficos e Laudos):            ██████████████████████████████ 100% ✅
 Fase 6 (Suporte XLSX e Arquivos Brutos)██████████████████████████████ 100% ✅
 Fase 7 (Empacotamento IA p/ Windows):  ██████████████████████████████ 100% ✅
